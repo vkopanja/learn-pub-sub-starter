@@ -28,7 +28,7 @@ func main() {
 
 	chn, err := conn.Channel()
 	if err != nil {
-		fmt.Errorf("There was an error opening the channel: %w", err)
+		panic(fmt.Sprintf("There was an error opening the channel: %v", err))
 	}
 
 	playState := routing.PlayingState{
