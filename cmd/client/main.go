@@ -43,6 +43,51 @@ func main() {
 		fmt.Printf("there was an issue declaring and binding queue: %s", err.Error())
 	}
 
+	userGameState := gamelogic.NewGameState(username)
+	for {
+		input := gamelogic.GetInput()
+		breakFromRepl := false
+
+		switch input[0] {
+		case "spawn":
+			fmt.Println("sending spawn message")
+			err := userGameState.CommandSpawn(input)
+			if err != nil {
+				fmt.Printf("error spawning %v\n", input[1])
+			}
+		case "move":
+			fmt.Println("sending move message")
+			cmdMove, err := userGameState.CommandMove(input)
+			if err != nil {
+				fmt.Printf("error moving unit %v to %v\n", input[2], input[1])
+			}
+			fmt.Printf("player %v successfully moved units %v to %v\n", cmdMove.Player, cmdMove.Units, cmdMove.ToLocation)
+		case "status":
+			userGameState.CommandStatus()
+		case "help":
+			gamelogic.PrintClientHelp()
+		case "spam":
+			fmt.Println("Spamming not allowed yet!")
+		case "quit":
+			fmt.Println("exiting...")
+			ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+			defer cancel()
+			ctx.Done()
+
+			gamelogic.PrintQuit()
+
+			_, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer shutdownCancel()
+			breakFromRepl = true
+		default:
+			fmt.Println("unknown command")
+		}
+
+		if breakFromRepl {
+			break
+		}
+	}
+
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 

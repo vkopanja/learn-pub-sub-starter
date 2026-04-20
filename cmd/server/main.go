@@ -27,6 +27,12 @@ func main() {
 
 	fmt.Println("RabbitMQ connection successful!")
 
+	_, _, err = pubsub.DeclareAndBind(conn, routing.ExchangePerilTopic, routing.GameLogSlug,
+		"", pubsub.Durable)
+	if err != nil {
+		fmt.Println("there was an issue binding to peril topic")
+	}
+
 	gamelogic.PrintClientHelp()
 	for {
 		input := gamelogic.GetInput()
