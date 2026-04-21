@@ -46,21 +46,21 @@ func main() {
 			fmt.Println("sending resume message")
 			sendMessage(conn, false)
 		case "quit":
-			fmt.Println("exiting...")
 			ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 			defer cancel()
 			ctx.Done()
 
 			fmt.Println("Shutting down gracefully...")
-
-			_, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
-			defer shutdownCancel()
 			breakFromRepl = true
+		case "help":
+			gamelogic.PrintServerHelp()
 		default:
 			fmt.Println("unknown command")
 		}
 
 		if breakFromRepl {
+			_, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer shutdownCancel()
 			break
 		}
 	}

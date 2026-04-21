@@ -32,18 +32,20 @@ func main() {
 		panic(fmt.Sprintf("There was an issue with fetching username: %v", err.Error()))
 	}
 
-	_, _, err = pubsub.DeclareAndBind(
+	userGameState := gamelogic.NewGameState(username)
+
+	err = pubsub.SubscribeJSON(
 		conn,
 		routing.ExchangePerilDirect,
 		fmt.Sprintf("%s.%s", routing.PauseKey, username),
 		routing.PauseKey,
 		pubsub.Transient,
+		handlerPause(userGameState),
 	)
 	if err != nil {
-		fmt.Printf("there was an issue declaring and binding queue: %s", err.Error())
+		fmt.Printf("there was an issue subscribing JSON: %v", err.Error())
 	}
 
-	userGameState := gamelogic.NewGameState(username)
 	for {
 		input := gamelogic.GetInput()
 		breakFromRepl := false
@@ -60,6 +62,7 @@ func main() {
 			cmdMove, err := userGameState.CommandMove(input)
 			if err != nil {
 				fmt.Printf("error moving unit %v to %v\n", input[2], input[1])
+				continue
 			}
 			fmt.Printf("player %v successfully moved units %v to %v\n", cmdMove.Player, cmdMove.Units, cmdMove.ToLocation)
 		case "status":
@@ -69,32 +72,29 @@ func main() {
 		case "spam":
 			fmt.Println("Spamming not allowed yet!")
 		case "quit":
-			fmt.Println("exiting...")
 			ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 			defer cancel()
 			ctx.Done()
 
-			gamelogic.PrintQuit()
+			fmt.Println("Shutting down gracefully...")
 
-			_, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
-			defer shutdownCancel()
+			gamelogic.PrintQuit()
 			breakFromRepl = true
 		default:
 			fmt.Println("unknown command")
 		}
 
 		if breakFromRepl {
+			_, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer shutdownCancel()
 			break
 		}
 	}
+}
 
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer cancel()
-
-	<-ctx.Done()
-
-	fmt.Println("Shutting down gracefully...")
-
-	_, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer shutdownCancel()
+func handlerPause(gs *gamelogic.GameState) func(routing.PlayingState) {
+	return func(ps routing.PlayingState) {
+		gs.HandlePause(ps)
+		defer fmt.Print("> ")
+	}
 }

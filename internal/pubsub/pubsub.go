@@ -49,5 +49,44 @@ func DeclareAndBind(
 		return nil, amqp.Queue{}, fmt.Errorf("issue with queue declaration: %w", err)
 	}
 
+	err = chn.QueueBind(queueName, key, exchange, true, nil)
+	if err != nil {
+		return nil, amqp.Queue{}, fmt.Errorf("failed binding queue to exchange: %w", err)
+	}
+
 	return chn, queue, nil
+}
+
+func SubscribeJSON[T any](
+	conn *amqp.Connection,
+	exchange,
+	queueName,
+	key string,
+	queueType SimpleQueueType,
+	handler func(T),
+) error {
+	channel, queue, err := DeclareAndBind(conn, exchange, queueName, key, Durable)
+	if err != nil {
+		return fmt.Errorf("there was an issues with subscribing JSON: %v", err.Error())
+	}
+	if queue.Name == "" {
+		return fmt.Errorf("queue name was nil, queue not bound")
+	}
+
+	msgs, err := channel.Consume(queueName, "", false, false, false, false, nil)
+	if err != nil {
+		return fmt.Errorf("there was an issue consuming channel from queue %v, err: %v",
+			queueName, err.Error())
+	}
+
+	go func() {
+		for msg := range msgs {
+			var body T
+			json.Unmarshal(msg.Body, &body)
+			handler(body)
+			msg.Ack(false)
+		}
+	}()
+
+	return nil
 }
